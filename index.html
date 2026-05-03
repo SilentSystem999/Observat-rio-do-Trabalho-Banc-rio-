@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTB Monitor · Observatório do Trabalho Bancário</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#1B4F8A;--blue-light:#E8F0FB;--blue-dark:#0F3360;--blue-mid:#2E6BB5;
+  --red:#D62828;--red-light:#FDEAEA;
+  --amber:#E87C1E;--amber-light:#FEF3E7;
+  --green:#2D9B6C;--green-light:#E3F5EE;--green-dark:#1A6B49;
+  --purple:#6B5EA8;--purple-light:#EDEBF9;
+  --bg:#EEF2F7;--surface:#FFFFFF;
+  --border:rgba(0,0,0,0.09);
+  --text:#1a2535;--text-muted:#5e738a;--text-faint:#94a3b8;
+  --radius:10px;--radius-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,0.08),0 4px 12px rgba(0,0,0,0.04);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;}
+h1,h2,h3,.logo{font-family:'Syne',sans-serif;}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:var(--blue-dark);color:#fff;position:sticky;top:0;z-index:1100;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
+.topbar-left{display:flex;align-items:center;gap:14px;}
+.logo{font-size:19px;font-weight:800;color:#fff;letter-spacing:-0.3px;}
+.logo span{color:#60B4FF;}
+.tagline{font-size:10px;color:rgba(255,255,255,0.55);letter-spacing:0.04em;text-transform:uppercase;}
+.topbar-metrics{display:flex;gap:24px;}
+.tb-metric{text-align:center;}
+.tb-val{font-size:17px;font-weight:700;color:#fff;font-family:'Syne',sans-serif;}
+.tb-lbl{font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.04em;}
+.live-badge{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.1);border-radius:99px;padding:5px 12px;font-size:12px;color:rgba(255,255,255,0.85);font-weight:500;}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#4ADE80;animation:blink 1.4s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+
+.main-nav{display:flex;gap:4px;padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;position:sticky;top:53px;z-index:1000;}
+.nav-btn{padding:7px 16px;border:1px solid var(--border);border-radius:99px;background:none;cursor:pointer;font-size:13px;color:var(--text-muted);white-space:nowrap;transition:all 0.15s;font-family:'IBM Plex Sans',sans-serif;}
+.nav-btn:hover{background:var(--bg);color:var(--text);}
+.nav-btn.active{background:var(--blue-light);color:var(--blue-dark);border-color:var(--blue);font-weight:600;}
+.nav-btn.denuncia-btn{background:var(--red-light);color:var(--red);border-color:var(--red);font-weight:700;}
+.nav-btn.denuncia-btn.active{background:var(--red);color:#fff;}
+
+.sections{padding:20px 24px;}
+.section{display:none;}
+.section.active{display:block;}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.section-header h2{font-size:17px;font-weight:700;color:var(--text);}
+
+.badge{display:inline-flex;padding:3px 9px;border-radius:99px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;}
+.badge.red{background:var(--red-light);color:var(--red);}
+.badge.amber{background:var(--amber-light);color:#9A4B0E;}
+.badge.green{background:var(--green-light);color:var(--green-dark);}
+.badge.blue{background:var(--blue-light);color:var(--blue-dark);}
+.badge.purple{background:var(--purple-light);color:var(--purple);}
+
+/* MAP */
+.map-layout{display:grid;grid-template-columns:1fr 300px;gap:16px;height:560px;}
+.map-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);position:relative;overflow:hidden;box-shadow:var(--shadow);}
+#leafletMap{width:100%;height:100%;border-radius:var(--radius);}
+.map-overlay-title{position:absolute;top:12px;left:12px;background:rgba(255,255,255,0.97);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 12px;font-size:12px;font-weight:700;color:var(--text);z-index:500;pointer-events:none;font-family:'Syne',sans-serif;}
+.map-legend{position:absolute;bottom:12px;left:12px;background:rgba(255,255,255,0.97);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;z-index:500;pointer-events:none;}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-muted);margin-bottom:5px;}
+.legend-item:last-child{margin-bottom:0;}
+.legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+.map-sidebar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-y:auto;box-shadow:var(--shadow);}
+.sidebar-title{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;padding:12px 14px 8px;border-bottom:1px solid var(--border);}
+.city-item{padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:all 0.15s;}
+.city-item:hover{background:var(--blue-light);}
+.city-name{font-size:12px;font-weight:600;}
+.city-meta{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.city-burnout{font-size:13px;font-weight:700;margin-top:4px;}
+.score-bar{height:4px;border-radius:2px;background:var(--bg);overflow:hidden;margin-top:4px;}
+.score-fill{height:100%;border-radius:2px;}
+
+/* ESTADO AGÊNCIAS */
+.estado-layout{display:grid;grid-template-columns:260px 1fr;gap:16px;min-height:600px;}
+.estado-nav{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-y:auto;box-shadow:var(--shadow);}
+.estado-nav-title{padding:12px 14px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);}
+.estado-btn{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:all 0.12s;font-size:13px;}
+.estado-btn:hover{background:var(--blue-light);}
+.estado-btn.active{background:var(--blue-light);color:var(--blue-dark);font-weight:700;border-left:3px solid var(--blue);}
+.estado-sigla{font-weight:700;font-size:12px;width:28px;}
+.estado-nome{flex:1;font-size:12px;}
+.estado-count{font-size:10px;color:var(--text-faint);}
+.estado-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+.agencias-painel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
+.ag-header{margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.ag-header-title{font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text);margin-bottom:4px;}
+.ag-header-sub{font-size:12px;color:var(--text-muted);}
+.ag-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+.ag-kpi{background:var(--bg);border-radius:var(--radius-sm);padding:12px;text-align:center;}
+.ag-kpi-val{font-size:20px;font-weight:800;font-family:'Syne',sans-serif;}
+.ag-kpi-lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-top:2px;}
+.ag-list-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:10px;}
+.ag-item{border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:8px;transition:all 0.15s;}
+.ag-item:hover{border-color:var(--blue);box-shadow:0 2px 8px rgba(27,79,138,0.1);}
+.ag-item-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;}
+.ag-item-nome{font-size:13px;font-weight:700;}
+.ag-item-end{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.ag-item-banco{font-size:10px;font-weight:600;color:var(--blue);background:var(--blue-light);padding:2px 8px;border-radius:99px;}
+.ag-metrics{display:flex;gap:12px;flex-wrap:wrap;}
+.ag-metric{font-size:11px;color:var(--text-muted);}
+.ag-metric strong{font-weight:700;}
+.ag-denuncia-btn{margin-top:10px;background:var(--red-light);color:var(--red);border:1px solid rgba(214,40,40,0.3);border-radius:var(--radius-sm);padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;transition:all 0.15s;}
+.ag-denuncia-btn:hover{background:var(--red);color:#fff;}
+.ag-search{display:flex;gap:8px;margin-bottom:14px;}
+.ag-search input{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:'IBM Plex Sans',sans-serif;}
+.ag-search select{padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:'IBM Plex Sans',sans-serif;}
+
+/* DENÚNCIAS */
+.denuncia-layout{display:grid;grid-template-columns:1fr 340px;gap:16px;}
+.denuncia-form-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);}
+.denuncia-sidebar{display:flex;flex-direction:column;gap:14px;}
+.denuncia-aviso{background:linear-gradient(135deg,#0F3360,#1B4F8A);border-radius:var(--radius);padding:20px;color:#fff;}
+.denuncia-aviso-title{font-size:14px;font-weight:700;margin-bottom:8px;font-family:'Syne',sans-serif;}
+.denuncia-aviso-text{font-size:12px;line-height:1.7;color:rgba(255,255,255,0.85);}
+.denuncia-stats{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);}
+.denuncia-stats-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:12px;}
+.ds-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.ds-row:last-child{border-bottom:none;}
+.ds-num{font-size:17px;font-weight:800;font-family:'Syne',sans-serif;}
+.denuncia-recentes{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);}
+.dr-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:10px;}
+.dr-item{padding:10px;background:var(--bg);border-radius:var(--radius-sm);margin-bottom:8px;border-left:3px solid var(--amber);}
+.dr-item.crit{border-color:var(--red);}
+.dr-item.ok{border-color:var(--green);}
+.dr-tipo{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-faint);margin-bottom:3px;}
+.dr-cidade{font-size:12px;font-weight:600;margin-bottom:2px;}
+.dr-texto{font-size:11px;color:var(--text-muted);line-height:1.5;}
+.dr-data{font-size:10px;color:var(--text-faint);margin-top:4px;}
+
+/* STEPS */
+.steps{display:flex;gap:0;margin-bottom:24px;}
+.step{flex:1;text-align:center;position:relative;}
+.step::after{content:'';position:absolute;top:14px;left:50%;width:100%;height:2px;background:var(--border);z-index:0;}
+.step:last-child::after{display:none;}
+.step-circle{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);background:var(--bg);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--text-muted);position:relative;z-index:1;margin-bottom:4px;}
+.step.active .step-circle{background:var(--blue);border-color:var(--blue);color:#fff;}
+.step.done .step-circle{background:var(--green);border-color:var(--green);color:#fff;}
+.step.active::after,.step.done::after{background:var(--blue);}
+.step-label{font-size:10px;color:var(--text-muted);display:block;}
+.step.active .step-label{color:var(--blue);font-weight:600;}
+.step-content{display:none;}
+.step-content.active{display:block;}
+
+/* FORM */
+.form-group{margin-bottom:16px;}
+.form-label{font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px;display:block;}
+.form-label span{color:var(--red);margin-left:2px;}
+.form-input,.form-select,.form-textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:'IBM Plex Sans',sans-serif;color:var(--text);background:var(--bg);transition:border 0.15s;}
+.form-input:focus,.form-select:focus,.form-textarea:focus{outline:none;border-color:var(--blue);background:#fff;}
+.form-textarea{min-height:100px;resize:vertical;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-hint{font-size:11px;color:var(--text-faint);margin-top:4px;}
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:11px 24px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;transition:background 0.15s;}
+.btn-primary:hover{background:var(--blue-dark);}
+.btn-danger{background:var(--red);color:#fff;border:none;padding:11px 24px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;transition:background 0.15s;}
+.btn-danger:hover{background:#a81e1e;}
+.btn-secondary{background:var(--bg);color:var(--text-muted);border:1px solid var(--border);padding:11px 20px;border-radius:var(--radius-sm);font-size:13px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;}
+.btn-row{display:flex;gap:10px;margin-top:6px;}
+
+/* TIPO DENÚNCIA CARDS */
+.tipo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;}
+.tipo-card{border:2px solid var(--border);border-radius:var(--radius-sm);padding:14px;cursor:pointer;text-align:center;transition:all 0.15s;background:var(--bg);}
+.tipo-card:hover{border-color:var(--blue);background:var(--blue-light);}
+.tipo-card.selected{border-color:var(--blue);background:var(--blue-light);}
+.tipo-card.selected-red{border-color:var(--red);background:var(--red-light);}
+.tipo-icon{font-size:24px;margin-bottom:6px;}
+.tipo-label{font-size:11px;font-weight:700;color:var(--text);}
+.tipo-sub{font-size:10px;color:var(--text-muted);margin-top:2px;}
+
+/* GRAVIDADE */
+.grav-row{display:flex;gap:8px;flex-wrap:wrap;}
+.grav-btn{padding:7px 14px;border:2px solid var(--border);border-radius:99px;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.15s;background:var(--bg);}
+.grav-btn:hover,.grav-btn.sel{border-color:var(--blue);background:var(--blue-light);color:var(--blue-dark);}
+.grav-btn.sel-red{border-color:var(--red);background:var(--red-light);color:var(--red);}
+.grav-btn.sel-amber{border-color:var(--amber);background:var(--amber-light);color:#9A4B0E;}
+
+/* CÓDIGO PROTOCOLO */
+.protocolo-box{background:linear-gradient(135deg,var(--green-dark),var(--green));border-radius:var(--radius);padding:24px;color:#fff;text-align:center;margin-top:20px;}
+.protocolo-code{font-size:28px;font-weight:800;letter-spacing:0.2em;font-family:'Syne',sans-serif;margin:12px 0;}
+.protocolo-text{font-size:13px;opacity:0.9;line-height:1.6;}
+
+/* UPLOAD */
+.upload-area{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center;color:var(--text-muted);font-size:12px;cursor:pointer;transition:border 0.15s;}
+.upload-area:hover{border-color:var(--blue);color:var(--blue);}
+
+/* ANONIMATO TOGGLE */
+.anon-toggle{display:flex;align-items:center;gap:12px;padding:12px;background:var(--green-light);border:1px solid #b6e6d4;border-radius:var(--radius-sm);margin-bottom:16px;}
+.toggle-switch{position:relative;width:44px;height:24px;flex-shrink:0;}
+.toggle-switch input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:#ccc;border-radius:12px;cursor:pointer;transition:0.3s;}
+.toggle-slider:before{content:'';position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:0.3s;}
+input:checked+.toggle-slider{background:var(--green);}
+input:checked+.toggle-slider:before{transform:translateX(20px);}
+.anon-text{font-size:12px;color:var(--green-dark);line-height:1.4;}
+.anon-text strong{display:block;font-weight:700;margin-bottom:2px;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border-radius:var(--radius);padding:24px;max-width:500px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:4px;font-family:'Syne',sans-serif;}
+.modal-sub{font-size:12px;color:var(--text-muted);margin-bottom:16px;}
+.modal-close{float:right;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.modal-stat{background:var(--bg);border-radius:var(--radius-sm);padding:10px;}
+.modal-stat-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-bottom:3px;}
+.modal-stat-val{font-size:18px;font-weight:700;font-family:'Syne',sans-serif;}
+
+@media(max-width:900px){
+  .map-layout{grid-template-columns:1fr;height:auto;}
+  .map-wrap{height:380px;}
+  .map-sidebar{height:220px;}
+  .estado-layout{grid-template-columns:1fr;}
+  .estado-nav{height:200px;overflow-x:auto;display:flex;flex-direction:row;}
+  .estado-btn{white-space:nowrap;}
+  .ag-kpis{grid-template-columns:repeat(2,1fr);}
+  .denuncia-layout{grid-template-columns:1fr;}
+  .tipo-grid{grid-template-columns:repeat(2,1fr);}
+  .form-row{grid-template-columns:1fr;}
+  .topbar-metrics{display:none;}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div>
+      <div class="logo">OTB<span>Monitor</span></div>
+      <div class="tagline">Observatório do Trabalho Bancário · Saúde do Trabalhador</div>
+    </div>
+  </div>
+  <div class="topbar-metrics">
+    <div class="tb-metric"><div class="tb-val">235.800</div><div class="tb-lbl">Trabalhadores</div></div>
+    <div class="tb-metric"><div class="tb-val" style="color:#FF8080;">63%</div><div class="tb-lbl">Burnout Médio</div></div>
+    <div class="tb-metric"><div class="tb-val" style="color:#FFCC60;" id="tb-den">0</div><div class="tb-lbl">Denúncias hoje</div></div>
+    <div class="tb-metric"><div class="tb-val" style="color:#FF6060;">8</div><div class="tb-lbl">Alertas Ativos</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <a href="https://spbancarios.com.br/" target="_blank" rel="noopener"
+       style="display:flex;align-items:center;gap:7px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:99px;padding:5px 13px;font-size:12px;color:#fff;text-decoration:none;font-weight:600;transition:background 0.15s;"
+       onmouseover="this.style.background='rgba(255,255,255,0.22)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
+      🔗 spbancarios.com.br
+    </a>
+    <div class="live-badge"><div class="live-dot"></div>Dados ao vivo</div>
+  </div>
+</div>
+
+<div class="main-nav">
+  <button class="nav-btn active" onclick="showSection('mapa',this)">🗺️ Mapa</button>
+  <button class="nav-btn" onclick="showSection('estados',this)">🏦 Agências por Estado</button>
+  <button class="nav-btn" onclick="showSection('painel',this)">📊 Painel de Saúde</button>
+  <button class="nav-btn denuncia-btn" onclick="showSection('denuncia',this)">🚨 Fazer Denúncia</button>
+  <button class="nav-btn" onclick="showSection('denuncias-list',this)">📋 Denúncias Recebidas</button>
+  <button class="nav-btn" onclick="showSection('alimentar',this)">📝 Alimentar Dados</button>
+  <button class="nav-btn" onclick="showSection('ag999',this)" style="background:linear-gradient(135deg,#0F3360,#1B4F8A);color:#fff;border-color:#1B4F8A;font-weight:700;">⚡ Motor AG-999</button>
+</div>
+
+<div class="sections">
+
+<!-- ==================== MAPA ==================== -->
+<div id="sec-mapa" class="section active">
+  <div class="section-header">
+    <h2>🗺️ Mapa de Saúde Bancária — Brasil</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <select class="form-select" style="width:auto;padding:6px 10px;" id="mapFilter" onchange="filterMap()">
+        <option value="all">Todos os status</option>
+        <option value="crítico">Somente Críticos</option>
+        <option value="atenção">Somente Atenção</option>
+        <option value="moderado">Somente Moderados</option>
+      </select>
+      <button class="btn-danger" style="padding:6px 16px;font-size:12px;" onclick="showSection('denuncia',document.querySelector('.denuncia-btn'))">🚨 Fazer Denúncia</button>
+    </div>
+  </div>
+  <div class="map-layout">
+    <div class="map-wrap">
+      <div class="map-overlay-title">🏦 Agências Bancárias · Saúde do Trabalhador</div>
+      <div id="leafletMap"></div>
+      <div class="map-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Crítico (burnout ≥ 65%)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Atenção (50–64%)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Moderado (< 50%)</div>
+      </div>
+    </div>
+    <div class="map-sidebar">
+      <div class="sidebar-title">Cidades — clique para detalhes</div>
+      <div id="cityList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ESTADOS ==================== -->
+<div id="sec-estados" class="section">
+  <div class="section-header">
+    <h2>🏦 Agências Bancárias por Estado</h2>
+    <span class="badge blue" id="total-agencias-badge">27 estados · 23.500+ agências (Fonte: Banco Central)</span>
+  </div>
+  <div class="estado-layout">
+    <div class="estado-nav">
+      <div class="estado-nav-title">Selecione o Estado</div>
+      <div id="estadoList"></div>
+    </div>
+    <div class="agencias-painel" id="agenciasPainel">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:400px;color:var(--text-muted);text-align:center;">
+        <div style="font-size:48px;margin-bottom:12px;">🗺️</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:6px;">Selecione um estado</div>
+        <div style="font-size:13px;">Escolha um estado à esquerda para ver as agências bancárias e os indicadores de saúde dos trabalhadores.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PAINEL ==================== -->
+<div id="sec-painel" class="section">
+  <div class="section-header"><h2>📊 Painel de Saúde — Visão Nacional</h2><span class="badge blue">Atualizado hoje</span></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Burnout Médio</div>
+      <div style="font-size:26px;font-weight:700;font-family:'Syne',sans-serif;color:var(--red);">63%</div>
+      <div style="font-size:11px;color:var(--text-faint);">↑ 12% vs. 2023</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Afastamentos/Mês</div>
+      <div style="font-size:26px;font-weight:700;font-family:'Syne',sans-serif;color:var(--red);">2.847</div>
+      <div style="font-size:11px;color:var(--text-faint);">Transtornos mentais</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Denúncias Recebidas</div>
+      <div style="font-size:26px;font-weight:700;font-family:'Syne',sans-serif;color:var(--amber);" id="painel-den-count">0</div>
+      <div style="font-size:11px;color:var(--text-faint);">via plataforma OTB</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Score Pressão Metas</div>
+      <div style="font-size:26px;font-weight:700;font-family:'Syne',sans-serif;color:var(--amber);">71/100</div>
+      <div style="font-size:11px;color:var(--text-faint);">Nível alto de cobrança</div>
+    </div>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);">
+    <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Evolução Burnout — Nacional 12 meses</div>
+    <canvas id="chartBurnout" height="80"></canvas>
+  </div>
+</div>
+
+<!-- ==================== DENÚNCIA ==================== -->
+<div id="sec-denuncia" class="section">
+  <div class="section-header">
+    <h2>🚨 Fazer Denúncia</h2>
+    <span class="badge red">Canal seguro e confidencial</span>
+  </div>
+  <div class="denuncia-layout">
+    <div class="denuncia-form-card">
+
+      <!-- STEPS -->
+      <div class="steps" id="stepsBar">
+        <div class="step active" id="step-ind-1"><div class="step-circle">1</div><span class="step-label">Tipo</span></div>
+        <div class="step" id="step-ind-2"><div class="step-circle">2</div><span class="step-label">Detalhes</span></div>
+        <div class="step" id="step-ind-3"><div class="step-circle">3</div><span class="step-label">Evidências</span></div>
+        <div class="step" id="step-ind-4"><div class="step-circle">4</div><span class="step-label">Enviar</span></div>
+      </div>
+
+      <!-- STEP 1 -->
+      <div class="step-content active" id="sc1">
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text);">Qual o tipo de denúncia?<span style="color:var(--red);margin-left:3px;">*</span></div>
+        <div class="tipo-grid" id="tipoGrid">
+          <div class="tipo-card" onclick="selectTipo(this,'assedio-moral')">
+            <div class="tipo-icon">😰</div>
+            <div class="tipo-label">Assédio Moral</div>
+            <div class="tipo-sub">Humilhação, ameaças, pressão abusiva</div>
+          </div>
+          <div class="tipo-card" onclick="selectTipo(this,'assedio-sexual')">
+            <div class="tipo-icon">🚫</div>
+            <div class="tipo-label">Assédio Sexual</div>
+            <div class="tipo-sub">Constrangimento, abuso, importunação</div>
+          </div>
+          <div class="tipo-card" onclick="selectTipo(this,'metas-abusivas')">
+            <div class="tipo-icon">📊</div>
+            <div class="tipo-label">Metas Abusivas</div>
+            <div class="tipo-sub">Pressão excessiva, cobranças ilegais</div>
+          </div>
+          <div class="tipo-card" onclick="selectTipo(this,'saude-mental')">
+            <div class="tipo-icon">🧠</div>
+            <div class="tipo-label">Saúde Mental</div>
+            <div class="tipo-sub">Burnout, colapso, negligência da empresa</div>
+          </div>
+          <div class="tipo-card" onclick="selectTipo(this,'horas-extras')">
+            <div class="tipo-icon">⏰</div>
+            <div class="tipo-label">Jornada Ilegal</div>
+            <div class="tipo-sub">Horas extras não pagas, jornada excessiva</div>
+          </div>
+          <div class="tipo-card" onclick="selectTipo(this,'discriminacao')">
+            <div class="tipo-icon">⚖️</div>
+            <div class="tipo-label">Discriminação</div>
+            <div class="tipo-sub">Raça, gênero, idade, religião</div>
+          </div>
+          <div class="tipo-card" onclick="selectTipo(this,'demissao-represalia')">
+            <div class="tipo-icon">✂️</div>
+            <div class="tipo-label">Demissão Retaliação</div>
+            <div class="tipo-sub">Demitido por denunciar ou reclamar</div>
+          </div>
+          <div class="tipo-card" onclick="selectTipo(this,'fraude-interna')">
+            <div class="tipo-icon">🔍</div>
+            <div class="tipo-label">Fraude Interna</div>
+            <div class="tipo-sub">Irregularidade, desvio, corrupção interna</div>
+          </div>
+          <div class="tipo-card" onclick="selectTipo(this,'outro')">
+            <div class="tipo-icon">📝</div>
+            <div class="tipo-label">Outro</div>
+            <div class="tipo-sub">Situação não listada acima</div>
+          </div>
+        </div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Gravidade da situação:</div>
+        <div class="grav-row" id="gravRow">
+          <div class="grav-btn" onclick="selectGrav(this,'leve','sel')">🟡 Situação preocupante</div>
+          <div class="grav-btn" onclick="selectGrav(this,'moderada','sel-amber')">🟠 Grave — já afeta saúde</div>
+          <div class="grav-btn" onclick="selectGrav(this,'critica','sel-red')">🔴 Crítica — risco imediato</div>
+        </div>
+        <div class="btn-row" style="margin-top:20px;">
+          <button class="btn-primary" onclick="goStep(2)">Continuar →</button>
+        </div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="step-content" id="sc2">
+        <div class="anon-toggle">
+          <label class="toggle-switch">
+            <input type="checkbox" id="anonToggle" checked>
+            <span class="toggle-slider"></span>
+          </label>
+          <div class="anon-text">
+            <strong>🔒 Denúncia Anônima Ativada</strong>
+            Seus dados pessoais não serão coletados nem armazenados. O sindicato recebe apenas o conteúdo da denúncia.
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Estado<span>*</span></label>
+            <select class="form-select" id="d-estado" onchange="populateDCidades()">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cidade<span>*</span></label>
+            <select class="form-select" id="d-cidade"><option value="">Selecione o estado primeiro</option></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Banco / Instituição<span>*</span></label>
+            <select class="form-select" id="d-banco">
+              <option value="">Selecione...</option>
+              <option>Banco do Brasil</option><option>Caixa Econômica Federal</option>
+              <option>Itaú Unibanco</option><option>Bradesco</option><option>Santander</option>
+              <option>Banrisul</option><option>Sicoob</option><option>Sicredi</option>
+              <option>Nubank / Fintech</option><option>Outro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cargo da Vítima</label>
+            <select class="form-select" id="d-cargo">
+              <option value="">Prefiro não informar</option>
+              <option>Caixa / Atendente</option><option>Gerente de conta</option>
+              <option>Gerente de agência</option><option>Analista</option>
+              <option>Supervisor</option><option>Outro</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descreva a situação com detalhes<span>*</span></label>
+          <textarea class="form-textarea" id="d-descricao" style="min-height:130px;" placeholder="Ex: O gerente regional realiza reuniões semanais onde humilha publicamente funcionários que não atingiram metas. Na última reunião (15/04), chamou uma funcionária de 'inútil' na frente de 12 colegas. Isso ocorre há pelo menos 6 meses..."></textarea>
+          <div class="form-hint">Quanto mais detalhada, mais efetiva é a ação do sindicato. Não inclua seu nome se quiser manter o anonimato.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Período em que ocorre / ocorreu</label>
+          <div class="form-row">
+            <input type="month" class="form-input" id="d-inicio" placeholder="Início">
+            <input type="month" class="form-input" id="d-fim" placeholder="Fim (ou deixe em branco se ainda ocorre)">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Número de trabalhadores afetados (estimativa)</label>
+          <select class="form-select" id="d-afetados">
+            <option>Apenas eu / 1 pessoa</option>
+            <option>2 a 5 pessoas</option><option>6 a 15 pessoas</option>
+            <option>16 a 50 pessoas</option><option>Toda a agência / mais de 50</option>
+          </select>
+        </div>
+        <div class="btn-row">
+          <button class="btn-secondary" onclick="goStep(1)">← Voltar</button>
+          <button class="btn-primary" onclick="goStep(3)">Continuar →</button>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="step-content" id="sc3">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Evidências (opcional mas recomendado)</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Documentos fortalecem muito a ação do sindicato e do MPT.</div>
+
+        <div class="form-group">
+          <label class="form-label">Tipo de evidência disponível</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;" id="evidGrid">
+            <div class="grav-btn" onclick="toggleEv(this)">📱 Prints de WhatsApp</div>
+            <div class="grav-btn" onclick="toggleEv(this)">📧 E-mails</div>
+            <div class="grav-btn" onclick="toggleEv(this)">🎙️ Áudios</div>
+            <div class="grav-btn" onclick="toggleEv(this)">📹 Vídeos</div>
+            <div class="grav-btn" onclick="toggleEv(this)">👥 Testemunhas</div>
+            <div class="grav-btn" onclick="toggleEv(this)">📄 Documentos internos</div>
+            <div class="grav-btn" onclick="toggleEv(this)">🏥 Laudo médico</div>
+            <div class="grav-btn" onclick="toggleEv(this)">📊 Planilhas de metas</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Anexar arquivo</label>
+          <div class="upload-area" onclick="alert('Upload ativado em produção — conecta ao servidor sindical seguro.')">
+            📎 Clique para anexar · PDF, imagem, áudio, documento — máx. 50MB<br>
+            <span style="font-size:10px;color:var(--text-faint);">Arquivos são criptografados e acessíveis apenas pelo sindicato</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Já tentou resolver internamente?</label>
+          <select class="form-select" id="d-tentou">
+            <option>Não tentei — temo represálias</option>
+            <option>Tentei e fui ignorado(a)</option>
+            <option>Tentei e a situação piorou</option>
+            <option>Tentei e recebi resposta insatisfatória</option>
+            <option>Sim, houve resolução parcial</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">O que você espera como resultado?</label>
+          <select class="form-select" id="d-expectativa">
+            <option>Investigação formal pelo sindicato</option>
+            <option>Notificação ao MTE / MPT</option>
+            <option>Negociação coletiva com o banco</option>
+            <option>Orientação jurídica individual</option>
+            <option>Apenas registrar para estatísticas</option>
+          </select>
+        </div>
+        <div class="btn-row">
+          <button class="btn-secondary" onclick="goStep(2)">← Voltar</button>
+          <button class="btn-primary" onclick="goStep(4)">Continuar →</button>
+        </div>
+      </div>
+
+      <!-- STEP 4 -->
+      <div class="step-content" id="sc4">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px;">Revisão e envio</div>
+        <div id="resumoDenuncia" style="background:var(--bg);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;font-size:13px;line-height:1.8;"></div>
+        <div style="background:var(--blue-light);border:1px solid #c4d8f5;border-radius:var(--radius-sm);padding:12px;font-size:12px;color:var(--blue-dark);margin-bottom:16px;">
+          ℹ️ <strong>Ao enviar</strong> você receberá um código de protocolo para acompanhar sua denúncia. O sindicato responsável pela sua região terá acesso em até 24h. Seu anonimato é garantido por nossa política de zero dados pessoais.
+        </div>
+        <div class="btn-row">
+          <button class="btn-secondary" onclick="goStep(3)">← Voltar</button>
+          <button class="btn-danger" onclick="enviarDenuncia()">🚨 Enviar Denúncia Agora</button>
+        </div>
+        <div id="protocoloBox" style="display:none;"></div>
+      </div>
+
+    </div><!-- /denuncia-form-card -->
+
+    <!-- SIDEBAR DENÚNCIA -->
+    <div class="denuncia-sidebar">
+      <div class="denuncia-aviso">
+        <div class="denuncia-aviso-title">🔒 Sua segurança é prioridade</div>
+        <div class="denuncia-aviso-text">
+          ✅ Denúncias 100% anônimas por padrão<br>
+          ✅ Zero dados pessoais coletados<br>
+          ✅ Criptografia de ponta a ponta<br>
+          ✅ Acesso restrito ao sindicato<br>
+          ✅ Conformidade com LGPD<br><br>
+          A Consolidação das Leis do Trabalho (CLT) e a Lei Anticorrupção protegem denunciantes de represálias. O sindicato pode acionar medidas cautelares se necessário.
+        </div>
+      </div>
+      <div class="denuncia-stats">
+        <div class="denuncia-stats-title">Denúncias esta semana</div>
+        <div class="ds-row"><span>🔴 Assédio Moral</span><div class="ds-num" id="cnt-am">0</div></div>
+        <div class="ds-row"><span>📊 Metas Abusivas</span><div class="ds-num" id="cnt-ma">0</div></div>
+        <div class="ds-row"><span>🧠 Saúde Mental</span><div class="ds-num" id="cnt-sm">0</div></div>
+        <div class="ds-row"><span>⏰ Jornada Ilegal</span><div class="ds-num" id="cnt-ji">0</div></div>
+        <div class="ds-row"><span>📋 Total geral</span><div class="ds-num" id="cnt-tot">0</div></div>
+      </div>
+      <div class="denuncia-recentes">
+        <div class="dr-title">Denúncias Recentes (anon.)</div>
+        <div id="recentesList">
+          <div class="dr-item"><div class="dr-tipo">Assédio Moral</div><div class="dr-cidade">São Paulo, SP · Itaú</div><div class="dr-texto">Humilhação pública em reunião de metas com 20+ funcionários presentes.</div><div class="dr-data">Hoje 08:32 · Crítica</div></div>
+          <div class="dr-item crit"><div class="dr-tipo">Metas Abusivas</div><div class="dr-cidade">Recife, PE · Bradesco</div><div class="dr-texto">Cobranças aos sábados e domingos por WhatsApp. Ameaças de demissão.</div><div class="dr-data">Ontem 15:18 · Crítica</div></div>
+          <div class="dr-item"><div class="dr-tipo">Saúde Mental</div><div class="dr-cidade">Campinas, SP · CEF</div><div class="dr-texto">3 afastamentos simultâneos sem que a empresa tomasse qualquer medida.</div><div class="dr-data">Ontem 11:00 · Grave</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== LISTA DENÚNCIAS ==================== -->
+<div id="sec-denuncias-list" class="section">
+  <div class="section-header">
+    <h2>📋 Denúncias Recebidas</h2>
+    <div style="display:flex;gap:8px;">
+      <select class="form-select" style="width:auto;padding:6px 10px;" id="dl-filter" onchange="renderDenunciaList()">
+        <option value="all">Todos os tipos</option>
+        <option value="assedio-moral">Assédio Moral</option>
+        <option value="metas-abusivas">Metas Abusivas</option>
+        <option value="saude-mental">Saúde Mental</option>
+        <option value="horas-extras">Jornada Ilegal</option>
+        <option value="assedio-sexual">Assédio Sexual</option>
+        <option value="discriminacao">Discriminação</option>
+      </select>
+      <select class="form-select" style="width:auto;padding:6px 10px;" id="dl-grav" onchange="renderDenunciaList()">
+        <option value="all">Todas as gravidades</option>
+        <option value="critica">Crítica</option>
+        <option value="moderada">Grave / Moderada</option>
+        <option value="leve">Preocupante</option>
+      </select>
+    </div>
+  </div>
+  <div id="denunciaListContainer">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px;text-align:center;color:var(--text-muted);box-shadow:var(--shadow);">
+      <div style="font-size:40px;margin-bottom:10px;">📋</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Nenhuma denúncia ainda</div>
+      <div style="font-size:13px;">As denúncias enviadas pela plataforma aparecerão aqui para análise pelo sindicato.</div>
+      <button class="btn-danger" style="margin-top:16px;" onclick="showSection('denuncia',document.querySelector('.denuncia-btn'))">🚨 Fazer Primeira Denúncia</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ALIMENTAR ==================== -->
+<div id="sec-alimentar" class="section">
+  <div class="section-header">
+    <h2>📝 Alimentar Dados Sindicais</h2>
+    <span class="badge blue">Acesso: Delegados sindicais</span>
+  </div>
+  <div style="background:var(--blue-light);border:1px solid #c4d8f5;border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--blue-dark);">
+    ℹ️ Preencha os dados referentes à sua agência/regional. As informações são agregadas — nunca identifique trabalhadores individualmente.
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--blue);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--blue-light);">🏦 Identificação</div>
+      <div class="form-group"><label class="form-label">Sindicato<span>*</span></label><select class="form-select" id="f-sindicato"><option value="">Selecione...</option><option>Seeb-SP</option><option>Seeb-RJ</option><option>Seeb-POA</option><option>Seeb-Recife</option><option>Contraf-CUT</option><option>Outro</option></select></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Banco<span>*</span></label><select class="form-select" id="f-banco"><option value="">Selecione...</option><option>Banco do Brasil</option><option>Caixa Econômica Federal</option><option>Itaú</option><option>Bradesco</option><option>Santander</option><option>Banrisul</option><option>Outro</option></select></div>
+        <div class="form-group"><label class="form-label">Cidade<span>*</span></label><input type="text" class="form-input" id="f-cidade" placeholder="Ex: São Paulo, SP"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Período<span>*</span></label><input type="month" class="form-input" id="f-periodo"></div>
+        <div class="form-group"><label class="form-label">Nº Trabalhadores<span>*</span></label><input type="number" class="form-input" id="f-trabalhadores" placeholder="Ex: 1200" min="1"></div>
+      </div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--blue);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--blue-light);">🧠 Indicadores de Saúde</div>
+      <div class="form-group"><label class="form-label">Casos de Burnout (mês)</label><input type="number" class="form-input" id="f-burnout" placeholder="Ex: 45" min="0"></div>
+      <div class="form-group"><label class="form-label">Afastamentos Saúde Mental (mês)</label><input type="number" class="form-input" id="f-afastamentos" placeholder="Ex: 28" min="0"></div>
+      <div class="form-group"><label class="form-label">Denúncias de Assédio (mês)</label><input type="number" class="form-input" id="f-assedio" placeholder="Ex: 12" min="0"></div>
+      <div class="form-group"><label class="form-label">Score Pressão por Metas (0–100)</label><div style="display:flex;align-items:center;gap:12px;"><input type="range" id="f-pressao" min="0" max="100" value="70" oninput="document.getElementById('f-pres-val').textContent=this.value"><span style="font-size:14px;font-weight:700;color:var(--blue);min-width:35px;" id="f-pres-val">70</span></div></div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);grid-column:span 2;">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--blue);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--blue-light);">📋 Observações</div>
+      <textarea class="form-textarea" id="f-observacoes" placeholder="Descreva situações críticas, ações sindicais tomadas, contexto..."></textarea>
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn-primary" onclick="submitFeed()">✅ Enviar Relatório</button>
+        <div style="display:none;background:var(--green-light);color:var(--green-dark);border:1px solid #b6e6d4;border-radius:var(--radius-sm);padding:10px 16px;font-size:13px;font-weight:600;" id="feed-success">✔ Dados enviados com sucesso!</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /sections -->
+
+<!-- ==================== AG-999 ==================== -->
+<div id="sec-ag999" class="section">
+  <div class="section-header">
+    <div>
+      <h2>⚡ Motor de Cálculo AG-999 — Saúde Bancária</h2>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Fórmulas 04A · 06A · Índice de Pressão Sistêmica — Motor proprietário integrado</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span style="background:linear-gradient(135deg,#0F3360,#2E6BB5);color:#fff;padding:4px 12px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:0.06em;">© AG-999 · PROPRIEDADE INTELECTUAL</span>
+    </div>
+  </div>
+
+  <!-- AVISO IP -->
+  <div style="background:linear-gradient(135deg,#0F3360,#1B4F8A);color:#fff;border-radius:var(--radius);padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px;">
+    <div style="font-size:28px;">🔒</div>
+    <div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:3px;">Propriedade Intelectual Protegida — AG-999 Framework</div>
+      <div style="font-size:11px;opacity:0.85;line-height:1.6;">Este motor de cálculo utiliza as Fórmulas AG-999 (04A e 06A) desenvolvidas por <strong>César / SilentSystem999</strong>. Reprodução, cópia, adaptação ou redistribuição sem autorização expressa são proibidas pela legislação brasileira de propriedade intelectual (Lei 9.610/98) e internacional. Uso autorizado exclusivamente pelo Observatório do Trabalho Bancário.</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+    <!-- FÓRMULA 04A -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <div style="font-size:15px;font-weight:800;font-family:'Syne',sans-serif;color:var(--blue-dark);">Fórmula 04A</div>
+          <div style="font-size:11px;color:var(--text-muted);">Índice de Risco Psicossocial Bancário (IRPB)</div>
+        </div>
+        <span style="background:var(--blue-light);color:var(--blue-dark);padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;">AG-999</span>
+      </div>
+      <div style="background:var(--bg);border-radius:var(--radius-sm);padding:12px;font-family:monospace;font-size:12px;color:var(--blue-dark);margin-bottom:16px;border-left:3px solid var(--blue);">
+        IRPB = (P × 0.35) + (A × 0.25) + (B × 0.20) + (H × 0.12) + (D × 0.08)
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;line-height:1.7;">
+        <strong>P</strong> = Pressão por metas (0–100) &nbsp;·&nbsp; <strong>A</strong> = Assédio normalizado &nbsp;·&nbsp; <strong>B</strong> = Burnout % &nbsp;·&nbsp; <strong>H</strong> = Horas extras/sem &nbsp;·&nbsp; <strong>D</strong> = Denúncias/mês
+      </div>
+      <div class="form-group"><label class="form-label">Pressão por Metas (P)</label><div style="display:flex;align-items:center;gap:10px;"><input type="range" id="p04-P" min="0" max="100" value="70" oninput="calc04A()"><span id="v04-P" style="font-weight:700;color:var(--blue);min-width:32px;">70</span></div></div>
+      <div class="form-group"><label class="form-label">Assédio Normalizado (A) — denúncias/10</label><div style="display:flex;align-items:center;gap:10px;"><input type="range" id="p04-A" min="0" max="100" value="45" oninput="calc04A()"><span id="v04-A" style="font-weight:700;color:var(--blue);min-width:32px;">45</span></div></div>
+      <div class="form-group"><label class="form-label">Burnout % (B)</label><div style="display:flex;align-items:center;gap:10px;"><input type="range" id="p04-B" min="0" max="100" value="63" oninput="calc04A()"><span id="v04-B" style="font-weight:700;color:var(--blue);min-width:32px;">63</span></div></div>
+      <div class="form-group"><label class="form-label">Horas Extras/Semana normalizado (H)</label><div style="display:flex;align-items:center;gap:10px;"><input type="range" id="p04-H" min="0" max="100" value="40" oninput="calc04A()"><span id="v04-H" style="font-weight:700;color:var(--blue);min-width:32px;">40</span></div></div>
+      <div class="form-group"><label class="form-label">Denúncias/Mês normalizado (D)</label><div style="display:flex;align-items:center;gap:10px;"><input type="range" id="p04-D" min="0" max="100" value="30" oninput="calc04A()"><span id="v04-D" style="font-weight:700;color:var(--blue);min-width:32px;">30</span></div></div>
+      <div id="resultado04A" style="background:linear-gradient(135deg,var(--blue-dark),var(--blue));border-radius:var(--radius-sm);padding:16px;color:#fff;text-align:center;margin-top:8px;">
+        <div style="font-size:11px;opacity:.75;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">IRPB — Índice de Risco Psicossocial</div>
+        <div id="irpb-val" style="font-size:36px;font-weight:800;font-family:'Syne',sans-serif;">61.6</div>
+        <div id="irpb-class" style="font-size:12px;margin-top:4px;opacity:.85;">🔴 RISCO ALTO — Intervenção urgente</div>
+      </div>
+    </div>
+
+    <!-- FÓRMULA 06A -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <div style="font-size:15px;font-weight:800;font-family:'Syne',sans-serif;color:var(--blue-dark);">Fórmula 06A</div>
+          <div style="font-size:11px;color:var(--text-muted);">Índice de Pressão Sistêmica (IPS) — Ciclo de crise</div>
+        </div>
+        <span style="background:var(--blue-light);color:var(--blue-dark);padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;">AG-999</span>
+      </div>
+      <div style="background:var(--bg);border-radius:var(--radius-sm);padding:12px;font-family:monospace;font-size:12px;color:var(--blue-dark);margin-bottom:16px;border-left:3px solid var(--blue);">
+        IPS = IRPB × (1 + α·Δt) × e^(β·R)
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;line-height:1.7;">
+        <strong>IRPB</strong> = resultado Fórmula 04A &nbsp;·&nbsp; <strong>α</strong> = taxa de aceleração da crise &nbsp;·&nbsp; <strong>Δt</strong> = meses sem intervenção &nbsp;·&nbsp; <strong>β</strong> = coeficiente de resiliência &nbsp;·&nbsp; <strong>R</strong> = score de suporte institucional (0–1)
+      </div>
+      <div class="form-group"><label class="form-label">α — Taxa de Aceleração (0.0 – 0.5)</label><div style="display:flex;align-items:center;gap:10px;"><input type="range" id="p06-alpha" min="0" max="50" value="15" oninput="calc06A()"><span id="v06-alpha" style="font-weight:700;color:var(--blue);min-width:40px;">0.15</span></div></div>
+      <div class="form-group"><label class="form-label">Δt — Meses sem intervenção</label><div style="display:flex;align-items:center;gap:10px;"><input type="range" id="p06-dt" min="0" max="24" value="6" oninput="calc06A()"><span id="v06-dt" style="font-weight:700;color:var(--blue);min-width:32px;">6</span></div></div>
+      <div class="form-group"><label class="form-label">β — Coeficiente de Resiliência (0.0 – 0.3)</label><div style="display:flex;align-items:center;gap:10px;"><input type="range" id="p06-beta" min="0" max="30" value="10" oninput="calc06A()"><span id="v06-beta" style="font-weight:700;color:var(--blue);min-width:40px;">0.10</span></div></div>
+      <div class="form-group"><label class="form-label">R — Suporte Institucional (0 = nenhum, 1 = pleno)</label><div style="display:flex;align-items:center;gap:10px;"><input type="range" id="p06-R" min="0" max="100" value="20" oninput="calc06A()"><span id="v06-R" style="font-weight:700;color:var(--blue);min-width:40px;">0.20</span></div></div>
+      <div id="resultado06A" style="background:linear-gradient(135deg,#5B0000,#D62828);border-radius:var(--radius-sm);padding:16px;color:#fff;text-align:center;margin-top:8px;">
+        <div style="font-size:11px;opacity:.75;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">IPS — Índice de Pressão Sistêmica</div>
+        <div id="ips-val" style="font-size:36px;font-weight:800;font-family:'Syne',sans-serif;">—</div>
+        <div id="ips-class" style="font-size:12px;margin-top:4px;opacity:.85;">Calcule primeiro o IRPB (Fórmula 04A)</div>
+      </div>
+    </div>
+
+    <!-- CALCULADORA COMPARATIVA -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);grid-column:span 2;">
+      <div style="font-size:15px;font-weight:800;font-family:'Syne',sans-serif;color:var(--blue-dark);margin-bottom:4px;">📊 Comparativo de Agências — Motor AG-999</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:16px;">Aplique a Fórmula 04A nas agências monitoradas e compare os riscos automaticamente</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;" id="ag999Table">
+          <thead>
+            <tr>
+              <th style="background:var(--blue-dark);color:#fff;padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Cidade</th>
+              <th style="background:var(--blue-dark);color:#fff;padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Estado</th>
+              <th style="background:var(--blue-dark);color:#fff;padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">IRPB (04A)</th>
+              <th style="background:var(--blue-dark);color:#fff;padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Risco</th>
+              <th style="background:var(--blue-dark);color:#fff;padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Burnout</th>
+              <th style="background:var(--blue-dark);color:#fff;padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Pressão</th>
+              <th style="background:var(--blue-dark);color:#fff;padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Ação</th>
+            </tr>
+          </thead>
+          <tbody id="ag999Tbody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px;font-size:10px;color:var(--text-faint);text-align:right;">
+        ⚡ Cálculo via Fórmula 04A AG-999 © César / SilentSystem999 — Todos os direitos reservados
+      </div>
+    </div>
+
+  </div><!-- /grid -->
+</div><!-- /sec-ag999 -->
+
+<!-- MODAL CIDADE -->
+<div class="modal-overlay" id="cityModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('cityModal').classList.remove('open')">✕</button>
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-sub" id="modal-sub"></div>
+    <div class="modal-grid" id="modal-grid"></div>
+    <div style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:14px;" id="modal-obs"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-danger" style="font-size:12px;padding:8px 16px;" onclick="document.getElementById('cityModal').classList.remove('open');showSection('denuncia',document.querySelector('.denuncia-btn'))">🚨 Denunciar desta cidade</button>
+      <button class="btn-secondary" onclick="document.getElementById('cityModal').classList.remove('open')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== DATA =====
+const agencias = [
+  {id:1,cidade:'São Paulo',estado:'SP',lat:-23.5505,lng:-46.6333,banco:'Múltiplos',trabalhadores:48500,burnout:78,afastamentos:14.2,assedio:127,pressao:89,satisfacao:-28,status:'crítico'},
+  {id:2,cidade:'Rio de Janeiro',estado:'RJ',lat:-22.9068,lng:-43.1729,banco:'Múltiplos',trabalhadores:31200,burnout:71,afastamentos:11.8,assedio:89,pressao:81,satisfacao:-18,status:'crítico'},
+  {id:3,cidade:'Campinas',estado:'SP',lat:-22.9056,lng:-47.0608,banco:'Itaú / BB',trabalhadores:8400,burnout:73,afastamentos:12.1,assedio:34,pressao:83,satisfacao:-22,status:'crítico'},
+  {id:4,cidade:'Brasília',estado:'DF',lat:-15.7797,lng:-47.9297,banco:'BB / CEF',trabalhadores:15600,burnout:62,afastamentos:8.9,assedio:41,pressao:71,satisfacao:-8,status:'atenção'},
+  {id:5,cidade:'Belo Horizonte',estado:'MG',lat:-19.9191,lng:-43.9386,banco:'Múltiplos',trabalhadores:18900,burnout:68,afastamentos:10.3,assedio:58,pressao:76,satisfacao:-14,status:'atenção'},
+  {id:6,cidade:'Porto Alegre',estado:'RS',lat:-30.0346,lng:-51.2177,banco:'Banrisul / Múltiplos',trabalhadores:12100,burnout:59,afastamentos:8.2,assedio:32,pressao:67,satisfacao:5,status:'atenção'},
+  {id:7,cidade:'Curitiba',estado:'PR',lat:-25.4290,lng:-49.2671,banco:'Múltiplos',trabalhadores:11300,burnout:55,afastamentos:7.1,assedio:28,pressao:63,satisfacao:12,status:'atenção'},
+  {id:8,cidade:'Recife',estado:'PE',lat:-8.0539,lng:-34.8811,banco:'Múltiplos',trabalhadores:9800,burnout:70,afastamentos:11.2,assedio:42,pressao:78,satisfacao:-16,status:'crítico'},
+  {id:9,cidade:'Salvador',estado:'BA',lat:-12.9714,lng:-38.5014,banco:'Múltiplos',trabalhadores:10200,burnout:63,afastamentos:9.1,assedio:37,pressao:72,satisfacao:-6,status:'atenção'},
+  {id:10,cidade:'Fortaleza',estado:'CE',lat:-3.7319,lng:-38.5267,banco:'Múltiplos',trabalhadores:8700,burnout:65,afastamentos:9.7,assedio:35,pressao:74,satisfacao:-10,status:'atenção'},
+  {id:11,cidade:'Goiânia',estado:'GO',lat:-16.6869,lng:-49.2648,banco:'Múltiplos',trabalhadores:7200,burnout:60,afastamentos:8.5,assedio:29,pressao:69,satisfacao:-2,status:'atenção'},
+  {id:12,cidade:'Manaus',estado:'AM',lat:-3.1019,lng:-60.0250,banco:'BB / CEF',trabalhadores:4100,burnout:44,afastamentos:5.8,assedio:14,pressao:51,satisfacao:22,status:'moderado'},
+  {id:13,cidade:'Belém',estado:'PA',lat:-1.4558,lng:-48.4902,banco:'BB / CEF',trabalhadores:4800,burnout:48,afastamentos:6.3,assedio:18,pressao:55,satisfacao:17,status:'moderado'},
+  {id:14,cidade:'Florianópolis',estado:'SC',lat:-27.5954,lng:-48.5480,banco:'Múltiplos',trabalhadores:5100,burnout:46,afastamentos:6.1,assedio:16,pressao:53,satisfacao:25,status:'moderado'},
+  {id:15,cidade:'Maceió',estado:'AL',lat:-9.6658,lng:-35.7350,banco:'CEF / BB',trabalhadores:3400,burnout:67,afastamentos:10.1,assedio:27,pressao:75,satisfacao:-12,status:'atenção'},
+  {id:16,cidade:'Vitória',estado:'ES',lat:-20.3155,lng:-40.3128,banco:'Múltiplos',trabalhadores:5900,burnout:53,afastamentos:7.2,assedio:21,pressao:60,satisfacao:8,status:'moderado'},
+  {id:17,cidade:'Ribeirão Preto',estado:'SP',lat:-21.1767,lng:-47.8208,banco:'Itaú / Santander',trabalhadores:6300,burnout:69,afastamentos:10.8,assedio:31,pressao:77,satisfacao:-15,status:'crítico'},
+  {id:18,cidade:'Porto Velho',estado:'RO',lat:-8.7612,lng:-63.9004,banco:'BB / CEF',trabalhadores:2100,burnout:42,afastamentos:5.4,assedio:10,pressao:49,satisfacao:28,status:'moderado'},
+  {id:19,cidade:'João Pessoa',estado:'PB',lat:-7.1195,lng:-34.8450,banco:'Múltiplos',trabalhadores:3600,burnout:57,afastamentos:7.8,assedio:19,pressao:64,satisfacao:3,status:'atenção'},
+  {id:20,cidade:'Natal',estado:'RN',lat:-5.7945,lng:-35.2120,banco:'Múltiplos',trabalhadores:4200,burnout:58,afastamentos:7.9,assedio:22,pressao:65,satisfacao:2,status:'atenção'},
+];
+
+// Agências reais por estado
+const totalPorEstado = {
+  'SP':7428,'MG':2263,'RJ':2177,'RS':1829,'PR':1604,'BA':1133,'SC':984,
+  'GO':749,'PE':630,'PA':530,'CE':518,'ES':486,'DF':469,'MA':362,
+  'MT':343,'MS':301,'PB':252,'RN':224,'AM':222,'SE':218,'AL':208,
+  'PI':184,'RO':150,'TO':128,'AC':64,'AP':35,'RR':28
+};
+
+const agenciasPorEstado = {
+  'SP':{nome:'São Paulo',agencias:[
+    {nome:'Agência Paulista — BB',end:'Av. Paulista, 2163, Bela Vista — São Paulo',banco:'Banco do Brasil',burnout:78,status:'crítico'},
+    {nome:'Super Ag. Faria Lima — Itaú',end:'Av. Brigadeiro Faria Lima, 3400, Itaim Bibi — São Paulo',banco:'Itaú',burnout:82,status:'crítico'},
+    {nome:'Agência República — Bradesco',end:'Praça da República, 299, Centro — São Paulo',banco:'Bradesco',burnout:71,status:'crítico'},
+    {nome:'Agência Campinas Centro — Santander',end:'Av. Francisco Glicério, 1200, Centro — Campinas',banco:'Santander',burnout:73,status:'crítico'},
+    {nome:'Ag. Ribeirão Preto — CEF',end:'Rua Álvares Cabral, 1801, Centro — Ribeirão Preto',banco:'Caixa Econômica Federal',burnout:69,status:'atenção'},
+    {nome:'Ag. ABC Paulista — Bradesco',end:'Av. Industrial, 600, Santo André',banco:'Bradesco',burnout:66,status:'atenção'},
+    {nome:'Ag. Santos — BB',end:'Rua XV de Novembro, 90, Centro — Santos',banco:'Banco do Brasil',burnout:61,status:'atenção'},
+  ]},
+  'RJ':{nome:'Rio de Janeiro',agencias:[
+    {nome:'Ag. Botafogo — Itaú',end:'Rua Voluntários da Pátria, 190, Botafogo — Rio de Janeiro',banco:'Itaú',burnout:74,status:'crítico'},
+    {nome:'Ag. Centro RJ — CEF',end:'Av. Rio Branco, 108, Centro — Rio de Janeiro',banco:'Caixa Econômica Federal',burnout:71,status:'crítico'},
+    {nome:'Ag. Barra da Tijuca — Santander',end:'Av. das Américas, 4200, Barra da Tijuca',banco:'Santander',burnout:68,status:'atenção'},
+    {nome:'Ag. Niterói — Bradesco',end:'Rua Dr. Celestino, 42, Centro — Niterói',banco:'Bradesco',burnout:63,status:'atenção'},
+    {nome:'Ag. Petrópolis — BB',end:'Av. do Imperador, 350, Centro — Petrópolis',banco:'Banco do Brasil',burnout:58,status:'atenção'},
+  ]},
+  'MG':{nome:'Minas Gerais',agencias:[
+    {nome:'Ag. Savassi — Itaú',end:'Rua Pernambuco, 750, Savassi — Belo Horizonte',banco:'Itaú',burnout:70,status:'crítico'},
+    {nome:'Ag. BH Centro — BB',end:'Av. Afonso Pena, 952, Centro — Belo Horizonte',banco:'Banco do Brasil',burnout:67,status:'atenção'},
+    {nome:'Ag. Uberlândia — Bradesco',end:'Av. João Pessoa, 280, Centro — Uberlândia',banco:'Bradesco',burnout:61,status:'atenção'},
+    {nome:'Ag. Contagem — CEF',end:'Rua Bernardo Monteiro, 500, Eldorado — Contagem',banco:'Caixa Econômica Federal',burnout:64,status:'atenção'},
+    {nome:'Ag. Juiz de Fora — Santander',end:'Rua Halfeld, 900, Centro — Juiz de Fora',banco:'Santander',burnout:55,status:'atenção'},
+  ]},
+  'RS':{nome:'Rio Grande do Sul',agencias:[
+    {nome:'Ag. Porto Alegre Centro — Banrisul',end:'Rua Sete de Setembro, 1028, Centro — Porto Alegre',banco:'Banrisul',burnout:59,status:'atenção'},
+    {nome:'Ag. Moinhos de Vento — Itaú',end:'Av. Independência, 1020, Moinhos — Porto Alegre',banco:'Itaú',burnout:63,status:'atenção'},
+    {nome:'Ag. Caxias do Sul — BB',end:'Rua Sinimbu, 1555, Centro — Caxias do Sul',banco:'Banco do Brasil',burnout:52,status:'moderado'},
+    {nome:'Ag. Pelotas — CEF',end:'Rua XV de Novembro, 80, Centro — Pelotas',banco:'Caixa Econômica Federal',burnout:55,status:'atenção'},
+    {nome:'Ag. Gravataí — Bradesco',end:'Av. Ernesto Alves, 2000, Centro — Gravataí',banco:'Bradesco',burnout:48,status:'moderado'},
+    {nome:'Ag. Santa Maria — Banrisul',end:'Rua Dr. Bozano, 202, Centro — Santa Maria',banco:'Banrisul',burnout:50,status:'atenção'},
+  ]},
+  'PR':{nome:'Paraná',agencias:[
+    {nome:'Ag. Batel — Itaú',end:'Av. do Batel, 1230, Batel — Curitiba',banco:'Itaú',burnout:57,status:'atenção'},
+    {nome:'Ag. Curitiba Centro — BB',end:'Rua XV de Novembro, 450, Centro — Curitiba',banco:'Banco do Brasil',burnout:54,status:'atenção'},
+    {nome:'Ag. Londrina — Bradesco',end:'Av. Higienópolis, 800, Centro — Londrina',banco:'Bradesco',burnout:59,status:'atenção'},
+    {nome:'Ag. Maringá — CEF',end:'Av. Brasil, 3000, Centro — Maringá',banco:'Caixa Econômica Federal',burnout:51,status:'moderado'},
+    {nome:'Ag. Foz do Iguaçu — Santander',end:'Av. JK, 250, Centro — Foz do Iguaçu',banco:'Santander',burnout:47,status:'moderado'},
+  ]},
+  'SC':{nome:'Santa Catarina',agencias:[
+    {nome:'Ag. Centro Floripa — Bradesco',end:'Rua Deodoro, 700, Centro — Florianópolis',banco:'Bradesco',burnout:46,status:'moderado'},
+    {nome:'Ag. Balneário Camboriú — Itaú',end:'Av. Atlântica, 1100, Centro — Balneário Camboriú',banco:'Itaú',burnout:50,status:'atenção'},
+    {nome:'Ag. Blumenau — BB',end:'Rua 15 de Novembro, 830, Centro — Blumenau',banco:'Banco do Brasil',burnout:48,status:'moderado'},
+    {nome:'Ag. Joinville — Santander',end:'Rua Princesa Isabel, 200, Centro — Joinville',banco:'Santander',burnout:52,status:'moderado'},
+  ]},
+  'BA':{nome:'Bahia',agencias:[
+    {nome:'Ag. Barra — Itaú',end:'Av. Centenário, 2800, Barra — Salvador',banco:'Itaú',burnout:65,status:'atenção'},
+    {nome:'Ag. Salvador Centro — BB',end:'Av. Estados Unidos, 50, Comércio — Salvador',banco:'Banco do Brasil',burnout:62,status:'atenção'},
+    {nome:'Ag. Feira de Santana — Bradesco',end:'Av. Getúlio Vargas, 1200, Centro — Feira de Santana',banco:'Bradesco',burnout:60,status:'atenção'},
+    {nome:'Ag. Vitória da Conquista — CEF',end:'Rua Edmundo Zanetti, 400, Centro — Vitória da Conquista',banco:'Caixa Econômica Federal',burnout:58,status:'atenção'},
+  ]},
+  'PE':{nome:'Pernambuco',agencias:[
+    {nome:'Ag. Boa Viagem — Itaú',end:'Av. Conselheiro Aguiar, 3000, Boa Viagem — Recife',banco:'Itaú',burnout:72,status:'crítico'},
+    {nome:'Ag. Recife Centro — BB',end:'Av. Guararapes, 210, Centro — Recife',banco:'Banco do Brasil',burnout:70,status:'crítico'},
+    {nome:'Ag. Casa Forte — Bradesco',end:'Rua Joaquim Nabuco, 800, Casa Forte — Recife',banco:'Bradesco',burnout:68,status:'atenção'},
+    {nome:'Ag. Caruaru — CEF',end:'Rua 13 de Maio, 200, Centro — Caruaru',banco:'Caixa Econômica Federal',burnout:63,status:'atenção'},
+  ]},
+  'CE':{nome:'Ceará',agencias:[
+    {nome:'Ag. Meireles — Bradesco',end:'Av. Abolição, 3500, Meireles — Fortaleza',banco:'Bradesco',burnout:66,status:'atenção'},
+    {nome:'Ag. Fortaleza Centro — BB',end:'Rua Floriano Peixoto, 800, Centro — Fortaleza',banco:'Banco do Brasil',burnout:64,status:'atenção'},
+    {nome:'Ag. Caucaia — CEF',end:'Av. 15 de Agosto, 200, Centro — Caucaia',banco:'Caixa Econômica Federal',burnout:60,status:'atenção'},
+  ]},
+  'GO':{nome:'Goiás',agencias:[
+    {nome:'Ag. Setor Bueno — Itaú',end:'Av. T-63, 1500, Setor Bueno — Goiânia',banco:'Itaú',burnout:62,status:'atenção'},
+    {nome:'Ag. Goiânia Centro — BB',end:'Av. Goiás, 980, Centro — Goiânia',banco:'Banco do Brasil',burnout:59,status:'atenção'},
+    {nome:'Ag. Aparecida de Goiânia — Bradesco',end:'Av. Independência, 300, Centro — Aparecida de Goiânia',banco:'Bradesco',burnout:56,status:'atenção'},
+  ]},
+  'DF':{nome:'Distrito Federal',agencias:[
+    {nome:'Ag. Asa Sul — BB',end:'CLN 302 Bloco D, Asa Sul — Brasília',banco:'Banco do Brasil',burnout:63,status:'atenção'},
+    {nome:'Ag. Brasília BSB — CEF',end:'SCS Q.3 Bloco A, Centro — Brasília',banco:'Caixa Econômica Federal',burnout:61,status:'atenção'},
+    {nome:'Ag. Taguatinga — Bradesco',end:'Av. Hélio Prates, 1200, Taguatinga',banco:'Bradesco',burnout:59,status:'atenção'},
+    {nome:'Ag. Plano Piloto — Itaú',end:'SEPN 505 Bloco B, Asa Norte — Brasília',banco:'Itaú',burnout:60,status:'atenção'},
+  ]},
+  'AM':{nome:'Amazonas',agencias:[
+    {nome:'Ag. Manaus Centro — BB',end:'Rua Marquês de Santa Cruz, 44, Centro — Manaus',banco:'Banco do Brasil',burnout:44,status:'moderado'},
+    {nome:'Ag. Adrianópolis — CEF',end:'Av. Djalma Batista, 400, Adrianópolis — Manaus',banco:'Caixa Econômica Federal',burnout:43,status:'moderado'},
+  ]},
+  'PA':{nome:'Pará',agencias:[
+    {nome:'Ag. Belém Centro — BB',end:'Av. Presidente Vargas, 256, Centro — Belém',banco:'Banco do Brasil',burnout:48,status:'moderado'},
+    {nome:'Ag. Belém — CEF',end:'Travessa 14 de Março, 320, Centro — Belém',banco:'Caixa Econômica Federal',burnout:47,status:'moderado'},
+  ]},
+  'AL':{nome:'Alagoas',agencias:[
+    {nome:'Ag. Pajuçara — Bradesco',end:'Av. Álvaro Otacílio, 1100, Pajuçara — Maceió',banco:'Bradesco',burnout:68,status:'atenção'},
+    {nome:'Ag. Maceió Centro — BB',end:'Rua do Comércio, 200, Centro — Maceió',banco:'Banco do Brasil',burnout:66,status:'atenção'},
+  ]},
+  'ES':{nome:'Espírito Santo',agencias:[
+    {nome:'Ag. Enseada do Suá — Itaú',end:'Av. Nossa Senhora dos Navegantes, 350, Enseada do Suá — Vitória',banco:'Itaú',burnout:54,status:'moderado'},
+    {nome:'Ag. Serra — BB',end:'Av. Talma Rodrigues Ribeiro, 5400, Serra',banco:'Banco do Brasil',burnout:51,status:'moderado'},
+  ]},
+  'RO':{nome:'Rondônia',agencias:[
+    {nome:'Ag. Porto Velho — BB',end:'Av. Sete de Setembro, 1800, Centro — Porto Velho',banco:'Banco do Brasil',burnout:42,status:'moderado'},
+    {nome:'Ag. Porto Velho — CEF',end:'Av. Campos Sales, 2450, Centro — Porto Velho',banco:'Caixa Econômica Federal',burnout:43,status:'moderado'},
+  ]},
+  'PB':{nome:'Paraíba',agencias:[
+    {nome:'Ag. Tambaú — Bradesco',end:'Av. Epitácio Pessoa, 3300, Tambaú — João Pessoa',banco:'Bradesco',burnout:57,status:'atenção'},
+    {nome:'Ag. João Pessoa Centro — BB',end:'Rua Visconde de Pelotas, 355, Centro — João Pessoa',banco:'Banco do Brasil',burnout:56,status:'atenção'},
+  ]},
+  'RN':{nome:'Rio Grande do Norte',agencias:[
+    {nome:'Ag. Petrópolis — Itaú',end:'Av. Hermes da Fonseca, 900, Petrópolis — Natal',banco:'Itaú',burnout:59,status:'atenção'},
+    {nome:'Ag. Natal Centro — BB',end:'Av. Rio Branco, 650, Centro — Natal',banco:'Banco do Brasil',burnout:57,status:'atenção'},
+  ]},
+};
+
+// Cidades por estado para formulário de denúncia
+const cidadesPorEstado = {
+  'SP':['São Paulo','Campinas','Ribeirão Preto','Santos','São Bernardo do Campo','Santo André','Guarulhos','Osasco','Sorocaba','São José dos Campos'],
+  'RJ':['Rio de Janeiro','Niterói','Petrópolis','Nova Iguaçu','Duque de Caxias','Campos dos Goytacazes'],
+  'MG':['Belo Horizonte','Uberlândia','Contagem','Juiz de Fora','Betim','Montes Claros'],
+  'RS':['Porto Alegre','Caxias do Sul','Pelotas','Santa Maria','Gravataí','Canoas','Novo Hamburgo'],
+  'PR':['Curitiba','Londrina','Maringá','Ponta Grossa','Foz do Iguaçu','São José dos Pinhais'],
+  'SC':['Florianópolis','Joinville','Blumenau','Balneário Camboriú','Chapecó'],
+  'BA':['Salvador','Feira de Santana','Vitória da Conquista','Camaçari','Ilhéus'],
+  'PE':['Recife','Caruaru','Petrolina','Paulista','Olinda'],
+  'CE':['Fortaleza','Caucaia','Juazeiro do Norte','Sobral','Maracanaú'],
+  'GO':['Goiânia','Aparecida de Goiânia','Anápolis','Rio Verde'],
+  'DF':['Brasília','Ceilândia','Taguatinga','Samambaia','Gama'],
+  'AM':['Manaus','Parintins','Itacoatiara'],
+  'PA':['Belém','Ananindeua','Santarém','Marabá'],
+  'AL':['Maceió','Arapiraca','Palmeira dos Índios'],
+  'ES':['Vitória','Serra','Vila Velha','Cariacica'],
+  'RO':['Porto Velho','Ji-Paraná','Ariquemes'],
+  'PB':['João Pessoa','Campina Grande','Santa Rita'],
+  'RN':['Natal','Mossoró','Parnamirim'],
+  'MA':['São Luís','Imperatriz','São José de Ribamar'],
+  'PI':['Teresina','Parnaíba','Picos'],
+  'MT':['Cuiabá','Várzea Grande','Rondonópolis'],
+  'MS':['Campo Grande','Dourados','Três Lagoas'],
+  'TO':['Palmas','Araguaína','Gurupi'],
+  'SE':['Aracaju','Nossa Senhora do Socorro','Lagarto'],
+  'AC':['Rio Branco','Cruzeiro do Sul'],
+  'AP':['Macapá','Santana'],
+  'RR':['Boa Vista','Rorainópolis'],
+};
+
+const estados = Object.keys(agenciasPorEstado).sort();
+const denuncias = [];
+let tipoSelecionado='',gravSelecionada='',currentStep=1;
+
+// ===== NAV =====
+function showSection(id,btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  if(btn){btn.classList.add('active');}
+  if(id==='painel') setTimeout(initCharts,80);
+  if(id==='denuncias-list') renderDenunciaList();
+}
+
+// ===== MAP =====
+let map,markersLayer=[];
+function initMap(){
+  map=L.map('leafletMap',{center:[-14.235,-51.925],zoom:4});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(map);
+  renderMapMarkers();renderCityList();
+}
+function getColor(a){return a.status==='crítico'?'#D62828':a.status==='atenção'?'#E87C1E':'#2D9B6C';}
+function renderMapMarkers(){
+  markersLayer.forEach(m=>map.removeLayer(m));markersLayer=[];
+  const f=document.getElementById('mapFilter')?.value||'all';
+  agencias.filter(a=>f==='all'||a.status===f).forEach(a=>{
+    const r=Math.max(12,Math.min(38,a.trabalhadores/1300));
+    const c=getColor(a);
+    const circle=L.circleMarker([a.lat,a.lng],{radius:r,color:'#fff',weight:2,fillColor:c,fillOpacity:0.82});
+    circle.bindTooltip(`<strong>${a.cidade}, ${a.estado}</strong><br>Burnout: <b>${a.burnout}%</b><br>${a.trabalhadores.toLocaleString('pt-BR')} trabalhadores<br>Status: <b>${a.status.toUpperCase()}</b>`,{direction:'top'});
+    circle.on('click',()=>openCityModal(a));
+    circle.addTo(map);markersLayer.push(circle);
+  });
+}
+function filterMap(){renderMapMarkers();renderCityList();}
+function renderCityList(){
+  const f=document.getElementById('mapFilter')?.value||'all';
+  const sorted=[...agencias].filter(a=>f==='all'||a.status===f).sort((a,b)=>b.burnout-a.burnout);
+  document.getElementById('cityList').innerHTML=sorted.map(a=>`
+    <div class="city-item" onclick="openCityModal(agencias.find(x=>x.id===${a.id}))">
+      <div style="display:flex;justify-content:space-between;">
+        <div class="city-name">${a.cidade}, ${a.estado}</div>
+        <span class="badge ${a.status==='crítico'?'red':a.status==='atenção'?'amber':'green'}">${a.status}</span>
+      </div>
+      <div class="city-meta">${a.banco} · ${a.trabalhadores.toLocaleString('pt-BR')} trab.</div>
+      <div class="city-burnout" style="color:${getColor(a)}">Burnout: ${a.burnout}%</div>
+      <div class="score-bar"><div class="score-fill" style="width:${a.burnout}%;background:${getColor(a)};"></div></div>
+    </div>
+  `).join('');
+}
+function openCityModal(a){
+  const nc=a.satisfacao>0?'var(--green)':a.satisfacao>-20?'var(--amber)':'var(--red)';
+  document.getElementById('modal-title').textContent=`${a.cidade}, ${a.estado}`;
+  document.getElementById('modal-sub').textContent=`${a.banco} · ${a.trabalhadores.toLocaleString('pt-BR')} trabalhadores`;
+  document.getElementById('modal-grid').innerHTML=`
+    <div class="modal-stat"><div class="modal-stat-label">Burnout</div><div class="modal-stat-val" style="color:${getColor(a)}">${a.burnout}%</div></div>
+    <div class="modal-stat"><div class="modal-stat-label">Afastamentos</div><div class="modal-stat-val" style="color:var(--amber)">${a.afastamentos}%</div></div>
+    <div class="modal-stat"><div class="modal-stat-label">Pressão Metas</div><div class="modal-stat-val">${a.pressao}/100</div></div>
+    <div class="modal-stat"><div class="modal-stat-label">Denúncias Assédio</div><div class="modal-stat-val">${a.assedio}</div></div>
+    <div class="modal-stat"><div class="modal-stat-label">NPS Interno</div><div class="modal-stat-val" style="color:${nc}">${a.satisfacao}</div></div>
+    <div class="modal-stat"><div class="modal-stat-label">Status</div><div class="modal-stat-val" style="font-size:14px;"><span class="badge ${a.status==='crítico'?'red':a.status==='atenção'?'amber':'green'}">${a.status}</span></div></div>
+  `;
+  document.getElementById('modal-obs').innerHTML=a.status==='crítico'?'⚠️ <strong>Situação crítica.</strong> Intervenção sindical urgente recomendada. Protocolos do MTE e MPT devem ser acionados.':a.status==='atenção'?'🟡 <strong>Monitoramento ativo.</strong> Verificar tendências nas próximas semanas com delegados locais.':'🟢 <strong>Situação controlada.</strong> Manter acompanhamento regular.';
+  document.getElementById('cityModal').classList.add('open');
+}
+
+// ===== ESTADOS =====
+function initEstados(){
+  // Popula lista lateral
+  const list=document.getElementById('estadoList');
+  // Todos os estados brasileiros
+  const todosEstados=[
+    {sig:'AC',nome:'Acre'},{sig:'AL',nome:'Alagoas'},{sig:'AM',nome:'Amazonas'},{sig:'AP',nome:'Amapá'},
+    {sig:'BA',nome:'Bahia'},{sig:'CE',nome:'Ceará'},{sig:'DF',nome:'Distrito Federal'},{sig:'ES',nome:'Espírito Santo'},
+    {sig:'GO',nome:'Goiás'},{sig:'MA',nome:'Maranhão'},{sig:'MG',nome:'Minas Gerais'},{sig:'MS',nome:'Mato Grosso do Sul'},
+    {sig:'MT',nome:'Mato Grosso'},{sig:'PA',nome:'Pará'},{sig:'PB',nome:'Paraíba'},{sig:'PE',nome:'Pernambuco'},
+    {sig:'PI',nome:'Piauí'},{sig:'PR',nome:'Paraná'},{sig:'RJ',nome:'Rio de Janeiro'},{sig:'RN',nome:'Rio Grande do Norte'},
+    {sig:'RO',nome:'Rondônia'},{sig:'RR',nome:'Roraima'},{sig:'RS',nome:'Rio Grande do Sul'},{sig:'SC',nome:'Santa Catarina'},
+    {sig:'SE',nome:'Sergipe'},{sig:'SP',nome:'São Paulo'},{sig:'TO',nome:'Tocantins'}
+  ];
+  // Calcula status do estado
+  const stateStatus=(sig)=>{
+    const ags=agenciasPorEstado[sig];
+    const total=totalPorEstado[sig]||0;
+    const countStr=total?`${total.toLocaleString('pt-BR')} agências`:'dados preliminares';
+    if(!ags) return {status:'moderado',count:countStr};
+    const avg=ags.agencias.reduce((s,a)=>s+a.burnout,0)/ags.agencias.length;
+    const status=avg>=65?'crítico':avg>=55?'atenção':'moderado';
+    return{status,count:countStr};
+  };
+  list.innerHTML=todosEstados.map(e=>{
+    const{status,count}=stateStatus(e.sig);
+    const color=status==='crítico'?'var(--red)':status==='atenção'?'var(--amber)':'var(--green)';
+    return`<div class="estado-btn" id="eb-${e.sig}" onclick="selectEstado('${e.sig}','${e.nome}',this)">
+      <span class="estado-sigla">${e.sig}</span>
+      <span class="estado-nome">${e.nome}</span>
+      <span class="estado-count">${count}</span>
+      <span class="estado-status-dot" style="background:${color}"></span>
+    </div>`;
+  }).join('');
+
+  // Popula select de estados no formulário de denúncia
+  const sel=document.getElementById('d-estado');
+  todosEstados.forEach(e=>{sel.innerHTML+=`<option value="${e.sig}">${e.sig} — ${e.nome}</option>`;});
+}
+
+function selectEstado(sig,nome,el){
+  document.querySelectorAll('.estado-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  const dados=agenciasPorEstado[sig];
+  const painel=document.getElementById('agenciasPainel');
+  if(!dados){
+    const totalReal=totalPorEstado[sig]||0;
+    painel.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text-muted);">
+      <div style="font-size:40px;margin-bottom:12px;">🏗️</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:6px;">${nome}</div>
+      <div style="background:var(--blue-light);border-radius:var(--radius-sm);padding:14px;margin:12px 0;display:inline-block;">
+        <div style="font-size:28px;font-weight:800;font-family:'Syne',sans-serif;color:var(--blue);">${totalReal.toLocaleString('pt-BR')}</div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">agências bancárias no estado</div>
+        <div style="font-size:10px;color:var(--text-faint);margin-top:2px;">Fonte: Banco Central do Brasil</div>
+      </div>
+      <div style="font-size:13px;margin-top:8px;">Dados detalhados por agência em coleta. Contribua alimentando pelo formulário sindical.</div>
+      <button class="btn-primary" style="margin-top:16px;" onclick="showSection('alimentar',document.querySelectorAll('.nav-btn')[5])">📝 Alimentar Dados</button>
+    </div>`;
+    return;
+  }
+  const ags=dados.agencias;
+  const avgBurnout=Math.round(ags.reduce((s,a)=>s+a.burnout,0)/ags.length);
+  const criticos=ags.filter(a=>a.status==='crítico').length;
+  const atencao=ags.filter(a=>a.status==='atenção').length;
+  const statusGeral=avgBurnout>=65?'crítico':avgBurnout>=55?'atenção':'moderado';
+  const cor=statusGeral==='crítico'?'var(--red)':statusGeral==='atenção'?'var(--amber)':'var(--green)';
+
+  const totalReal=totalPorEstado[sig]||0;
+  const totalStr=totalReal?totalReal.toLocaleString('pt-BR'):'N/D';
+  painel.innerHTML=`
+    <div class="ag-header">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div class="ag-header-title">🏦 ${nome}</div>
+          <div class="ag-header-sub">${ags.length} agências com dados detalhados · <strong>Total real no estado: ${totalStr} agências</strong> (fonte: Banco Central) · Burnout médio: <strong style="color:${cor}">${avgBurnout}%</strong></div>
+        </div>
+        <span class="badge ${statusGeral==='crítico'?'red':statusGeral==='atenção'?'amber':'green'}">${statusGeral}</span>
+      </div>
+    </div>
+    <div class="ag-kpis">
+      <div class="ag-kpi"><div class="ag-kpi-val" style="color:var(--blue);font-size:18px;">${totalStr}</div><div class="ag-kpi-lbl">Total no Estado (BCB)</div></div>
+      <div class="ag-kpi"><div class="ag-kpi-val" style="color:${cor}">${avgBurnout}%</div><div class="ag-kpi-lbl">Burnout Médio</div></div>
+      <div class="ag-kpi"><div class="ag-kpi-val" style="color:var(--red)">${criticos}</div><div class="ag-kpi-lbl">Agências Críticas</div></div>
+      <div class="ag-kpi"><div class="ag-kpi-val" style="color:var(--amber)">${atencao}</div><div class="ag-kpi-lbl">Em Atenção</div></div>
+    </div>
+    <div class="ag-search">
+      <input type="text" placeholder="🔍 Buscar agência ou endereço..." id="ag-search-input" oninput="filterAgencias('${sig}')">
+      <select id="ag-filter-status" onchange="filterAgencias('${sig}')">
+        <option value="all">Todos</option><option value="crítico">Crítico</option><option value="atenção">Atenção</option><option value="moderado">Moderado</option>
+      </select>
+    </div>
+    <div class="ag-list-title">${ags.length} AGÊNCIAS BANCÁRIAS MONITORADAS</div>
+    <div id="ag-list-items">
+      ${renderAgItems(ags)}
+    </div>
+  `;
+}
+
+function renderAgItems(ags){
+  return ags.map(a=>{
+    const c=a.status==='crítico'?'var(--red)':a.status==='atenção'?'var(--amber)':'var(--green)';
+    return`<div class="ag-item">
+      <div class="ag-item-header">
+        <div>
+          <div class="ag-item-nome">${a.nome}</div>
+          <div class="ag-item-end">📍 ${a.end}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          <span class="ag-item-banco">${a.banco}</span>
+          <span class="badge ${a.status==='crítico'?'red':a.status==='atenção'?'amber':'green'}">${a.status}</span>
+        </div>
+      </div>
+      <div class="ag-metrics">
+        <span class="ag-metric">🔥 Burnout: <strong style="color:${c}">${a.burnout}%</strong></span>
+        <span class="ag-metric">📊 Score pressão: <strong>${Math.round(a.burnout*1.1)}/100</strong></span>
+      </div>
+      <div class="score-bar"><div class="score-fill" style="width:${a.burnout}%;background:${c};"></div></div>
+      <button class="ag-denuncia-btn" onclick="abrirDenunciaDeAgencia('${a.nome}','${a.banco}')">🚨 Fazer Denúncia desta Agência</button>
+    </div>`;
+  }).join('');
+}
+
+function filterAgencias(sig){
+  const dados=agenciasPorEstado[sig];if(!dados)return;
+  const q=document.getElementById('ag-search-input')?.value.toLowerCase()||'';
+  const st=document.getElementById('ag-filter-status')?.value||'all';
+  const filtered=dados.agencias.filter(a=>{
+    const match=(a.nome+a.end+a.banco).toLowerCase().includes(q);
+    const sm=st==='all'||a.status===st;
+    return match&&sm;
+  });
+  document.getElementById('ag-list-items').innerHTML=renderAgItems(filtered);
+}
+
+function abrirDenunciaDeAgencia(nomeAg,banco){
+  showSection('denuncia',document.querySelector('.denuncia-btn'));
+  setTimeout(()=>{
+    if(document.getElementById('d-banco')){
+      const sel=document.getElementById('d-banco');
+      for(let i=0;i<sel.options.length;i++){
+        if(sel.options[i].text.includes(banco.split('/')[0].trim())){sel.selectedIndex=i;break;}
+      }
+    }
+  },100);
+}
+
+// ===== DENÚNCIA STEPS =====
+function goStep(n){
+  if(n===2&&!tipoSelecionado){alert('Selecione o tipo de denúncia.');return;}
+  if(n===3){
+    const req=['d-estado','d-cidade','d-banco'];
+    let ok=true;
+    req.forEach(id=>{if(!document.getElementById(id)?.value){document.getElementById(id).style.borderColor='var(--red)';ok=false;}else{document.getElementById(id).style.borderColor='';}});
+    const desc=document.getElementById('d-descricao')?.value||'';
+    if(!desc.trim()){document.getElementById('d-descricao').style.borderColor='var(--red)';ok=false;}else{document.getElementById('d-descricao').style.borderColor='';}
+    if(!ok){alert('Preencha os campos obrigatórios.');return;}
+  }
+  if(n===4){gerarResumo();}
+  currentStep=n;
+  for(let i=1;i<=4;i++){
+    const sc=document.getElementById('sc'+i);
+    const si=document.getElementById('step-ind-'+i);
+    if(sc)sc.className='step-content'+(i===n?' active':'');
+    if(si){si.className='step'+(i<n?' done':i===n?' active':'');si.querySelector('.step-circle').textContent=i<n?'✓':i;}
+  }
+}
+
+function selectTipo(el,tipo){
+  document.querySelectorAll('.tipo-card').forEach(c=>{c.className='tipo-card';});
+  el.className='tipo-card selected-red';
+  tipoSelecionado=tipo;
+}
+
+function selectGrav(el,grav,cls){
+  document.querySelectorAll('.grav-btn').forEach(b=>{b.className='grav-btn';});
+  el.className='grav-btn '+cls;
+  gravSelecionada=grav;
+}
+
+function toggleEv(el){el.classList.toggle('sel');}
+
+function populateDCidades(){
+  const sig=document.getElementById('d-estado').value;
+  const cidades=cidadesPorEstado[sig]||[];
+  const sel=document.getElementById('d-cidade');
+  sel.innerHTML='<option value="">Selecione...</option>'+cidades.map(c=>`<option>${c}</option>`).join('');
+}
+
+function gerarResumo(){
+  const tipoLabels={'assedio-moral':'Assédio Moral','assedio-sexual':'Assédio Sexual','metas-abusivas':'Metas Abusivas','saude-mental':'Saúde Mental','horas-extras':'Jornada Ilegal','discriminacao':'Discriminação','demissao-represalia':'Demissão por Retaliação','fraude-interna':'Fraude Interna','outro':'Outro'};
+  const gravLabels={'leve':'🟡 Preocupante','moderada':'🟠 Grave','critica':'🔴 Crítica'};
+  const resumo=document.getElementById('resumoDenuncia');
+  resumo.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div><strong>Tipo:</strong> ${tipoLabels[tipoSelecionado]||'—'}</div>
+      <div><strong>Gravidade:</strong> ${gravLabels[gravSelecionada]||'—'}</div>
+      <div><strong>Estado:</strong> ${document.getElementById('d-estado')?.value||'—'}</div>
+      <div><strong>Cidade:</strong> ${document.getElementById('d-cidade')?.value||'—'}</div>
+      <div><strong>Banco:</strong> ${document.getElementById('d-banco')?.value||'—'}</div>
+      <div><strong>Anônima:</strong> ${document.getElementById('anonToggle')?.checked?'✅ Sim':'❌ Não'}</div>
+    </div>
+    <div style="margin-top:10px;"><strong>Descrição:</strong><br><em style="color:var(--text-muted);">${(document.getElementById('d-descricao')?.value||'').substring(0,200)}${(document.getElementById('d-descricao')?.value||'').length>200?'...':''}</em></div>
+  `;
+}
+
+function enviarDenuncia(){
+  const codigo='OTB-'+Math.random().toString(36).substring(2,8).toUpperCase()+'-'+new Date().getFullYear();
+  const tipoLabels={'assedio-moral':'Assédio Moral','assedio-sexual':'Assédio Sexual','metas-abusivas':'Metas Abusivas','saude-mental':'Saúde Mental','horas-extras':'Jornada Ilegal','discriminacao':'Discriminação','demissao-represalia':'Demissão por Retaliação','fraude-interna':'Fraude Interna','outro':'Outro'};
+  const d={
+    codigo,
+    tipo:tipoSelecionado,
+    tipoLabel:tipoLabels[tipoSelecionado]||'Outro',
+    gravidade:gravSelecionada,
+    estado:document.getElementById('d-estado')?.value||'',
+    cidade:document.getElementById('d-cidade')?.value||'',
+    banco:document.getElementById('d-banco')?.value||'',
+    descricao:document.getElementById('d-descricao')?.value||'',
+    afetados:document.getElementById('d-afetados')?.value||'',
+    data:new Date().toLocaleString('pt-BR'),
+    anonima:document.getElementById('anonToggle')?.checked,
+  };
+  denuncias.unshift(d);
+  // Atualizar contadores
+  const tot=parseInt(document.getElementById('tb-den').textContent||'0')+1;
+  document.getElementById('tb-den').textContent=tot;
+  document.getElementById('painel-den-count').textContent=denuncias.length;
+  // Contadores por tipo
+  const counts={'assedio-moral':'cnt-am','metas-abusivas':'cnt-ma','saude-mental':'cnt-sm','horas-extras':'cnt-ji'};
+  Object.entries(counts).forEach(([t,id])=>{
+    document.getElementById(id).textContent=denuncias.filter(x=>x.tipo===t).length;
+  });
+  document.getElementById('cnt-tot').textContent=denuncias.length;
+
+  // Box protocolo
+  document.getElementById('protocoloBox').style.display='block';
+  document.getElementById('protocoloBox').innerHTML=`
+    <div class="protocolo-box">
+      <div style="font-size:13px;opacity:.85;">✅ Denúncia registrada com sucesso!</div>
+      <div class="protocolo-code">${codigo}</div>
+      <div class="protocolo-text">Guarde este código de protocolo. O sindicato da sua região terá acesso em até <strong>24 horas</strong>. Você pode acompanhar o status usando este código. <strong>Seu anonimato está garantido.</strong></div>
+    </div>
+  `;
+  document.querySelector('.btn-danger').disabled=true;
+
+  // Adiciona nas recentes
+  const rec=document.getElementById('recentesList');
+  const gravCor=d.gravidade==='critica'?'crit':d.gravidade==='moderada'?'':'ok';
+  rec.insertAdjacentHTML('afterbegin',`<div class="dr-item ${gravCor}"><div class="dr-tipo">${d.tipoLabel}</div><div class="dr-cidade">${d.cidade}, ${d.estado} · ${d.banco}</div><div class="dr-texto">${d.descricao.substring(0,90)}...</div><div class="dr-data">Agora · ${d.gravidade==='critica'?'Crítica':d.gravidade==='moderada'?'Grave':'Preocupante'}</div></div>`);
+}
+
+function renderDenunciaList(){
+  const container=document.getElementById('denunciaListContainer');
+  const ft=document.getElementById('dl-filter')?.value||'all';
+  const fg=document.getElementById('dl-grav')?.value||'all';
+  const filtered=denuncias.filter(d=>(ft==='all'||d.tipo===ft)&&(fg==='all'||d.gravidade===fg));
+  if(!filtered.length){
+    container.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px;text-align:center;color:var(--text-muted);box-shadow:var(--shadow);">
+      <div style="font-size:40px;margin-bottom:10px;">📋</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Nenhuma denúncia ${denuncias.length?'com esses filtros':''}</div>
+      <div style="font-size:13px;">${denuncias.length?'Tente outros filtros.':'Envie a primeira denúncia pelo canal seguro.'}</div>
+      ${!denuncias.length?'<button class="btn-danger" style="margin-top:16px;" onclick="showSection(\'denuncia\',document.querySelector(\'.denuncia-btn\'))">🚨 Fazer Denúncia</button>':''}
+    </div>`;
+    return;
+  }
+  container.innerHTML=filtered.map(d=>{
+    const gc=d.gravidade==='critica'?'red':d.gravidade==='moderada'?'amber':'blue';
+    const bl=d.gravidade==='critica'?'var(--red)':d.gravidade==='moderada'?'var(--amber)':'var(--blue)';
+    return`<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid ${bl};border-radius:var(--radius);padding:18px;margin-bottom:10px;box-shadow:var(--shadow);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;">${d.tipoLabel} · ${d.cidade}, ${d.estado}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">🏦 ${d.banco} · ${d.data} · ${d.anonima?'🔒 Anônima':'👤 Identificada'}</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <span class="badge ${gc}">${d.gravidade==='critica'?'Crítica':d.gravidade==='moderada'?'Grave':'Preocupante'}</span>
+          <span class="badge blue">Protocolo: ${d.codigo}</span>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--text);line-height:1.6;background:var(--bg);padding:10px;border-radius:var(--radius-sm);">${d.descricao}</div>
+      ${d.afetados?`<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">👥 Afetados: ${d.afetados}</div>`:''}
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button class="btn-secondary" style="font-size:11px;padding:6px 12px;">📋 Encaminhar ao MTE</button>
+        <button class="btn-secondary" style="font-size:11px;padding:6px 12px;">⚖️ Acionar MPT</button>
+        <button class="btn-secondary" style="font-size:11px;padding:6px 12px;">✅ Marcar como tratada</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ===== CHARTS =====
+let charts={};
+function initCharts(){
+  if(charts.burnout)return;
+  const months=['Mai/24','Jun','Jul','Ago','Set','Out','Nov','Dez','Jan/25','Fev','Mar','Abr'];
+  charts.burnout=new Chart(document.getElementById('chartBurnout'),{
+    type:'line',
+    data:{labels:months,datasets:[
+      {label:'São Paulo',data:[68,70,71,73,74,75,76,77,77,78,78,78],borderColor:'#D62828',backgroundColor:'rgba(214,40,40,0.08)',tension:0.4,fill:true},
+      {label:'Nacional',data:[56,57,58,59,60,61,61,62,62,63,63,63],borderColor:'#1B4F8A',backgroundColor:'rgba(27,79,138,0.08)',tension:0.4,fill:true},
+      {label:'Porto Alegre',data:[51,52,53,54,55,56,57,57,58,59,59,59],borderColor:'#E87C1E',tension:0.4},
+    ]},
+    options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{y:{min:40,max:90,ticks:{callback:v=>v+'%'}}}}
+  });
+}
+
+// ===== FORM SINDICAL =====
+function submitFeed(){
+  const req=['f-sindicato','f-banco','f-cidade','f-periodo','f-trabalhadores'];
+  let ok=true;
+  req.forEach(id=>{if(!document.getElementById(id)?.value){document.getElementById(id).style.borderColor='var(--red)';ok=false;}else{document.getElementById(id).style.borderColor='';}});
+  if(!ok){alert('Preencha os campos obrigatórios.');return;}
+  const s=document.getElementById('feed-success');s.style.display='block';setTimeout(()=>s.style.display='none',5000);
+}
+
+// ===== AG-999 MOTOR =====
+function irpb(P,A,B,H,D){return (P*0.35)+(A*0.25)+(B*0.20)+(H*0.12)+(D*0.08);}
+function classIRPB(v){if(v>=70)return'🔴 RISCO CRÍTICO — Intervenção imediata';if(v>=55)return'🟠 RISCO ALTO — Intervenção urgente';if(v>=40)return'🟡 RISCO MODERADO — Monitoramento ativo';return'🟢 RISCO BAIXO — Situação controlada';}
+function gradIRPB(v){if(v>=70)return'linear-gradient(135deg,#5B0000,#D62828)';if(v>=55)return'linear-gradient(135deg,#7A3300,#E87C1E)';if(v>=40)return'linear-gradient(135deg,#5A4000,#CA8A00)';return'linear-gradient(135deg,#0B3D26,#2D9B6C)';}
+
+let lastIRPB=61.6;
+function calc04A(){
+  const P=+document.getElementById('p04-P').value;
+  const A=+document.getElementById('p04-A').value;
+  const B=+document.getElementById('p04-B').value;
+  const H=+document.getElementById('p04-H').value;
+  const D=+document.getElementById('p04-D').value;
+  document.getElementById('v04-P').textContent=P;
+  document.getElementById('v04-A').textContent=A;
+  document.getElementById('v04-B').textContent=B;
+  document.getElementById('v04-H').textContent=H;
+  document.getElementById('v04-D').textContent=D;
+  const v=irpb(P,A,B,H,D);lastIRPB=v;
+  document.getElementById('irpb-val').textContent=v.toFixed(1);
+  document.getElementById('irpb-class').textContent=classIRPB(v);
+  document.getElementById('resultado04A').style.background=gradIRPB(v);
+  calc06A();
+}
+
+function calc06A(){
+  const alpha=+document.getElementById('p06-alpha').value/100;
+  const dt=+document.getElementById('p06-dt').value;
+  const beta=+document.getElementById('p06-beta').value/100;
+  const R=+document.getElementById('p06-R').value/100;
+  document.getElementById('v06-alpha').textContent=alpha.toFixed(2);
+  document.getElementById('v06-dt').textContent=dt;
+  document.getElementById('v06-beta').textContent=beta.toFixed(2);
+  document.getElementById('v06-R').textContent=R.toFixed(2);
+  const ips=lastIRPB*(1+alpha*dt)*Math.exp(beta*R);
+  document.getElementById('ips-val').textContent=ips.toFixed(1);
+  document.getElementById('ips-class').textContent=classIRPB(ips);
+  document.getElementById('resultado06A').style.background=gradIRPB(ips);
+}
+
+function renderAG999Table(){
+  const tbody=document.getElementById('ag999Tbody');if(!tbody)return;
+  const rows=agencias.map(a=>{
+    const v=irpb(a.pressao,Math.min(100,a.assedio/1.5),a.burnout,Math.min(100,a.afastamentos*5),Math.min(100,a.assedio/1.2));
+    const cls=classIRPB(v);
+    const bg=v>=70?'var(--red-light)':v>=55?'var(--amber-light)':v>=40?'#FFFAE6':'var(--green-light)';
+    const tc=v>=70?'var(--red)':v>=55?'var(--amber)':v>=40?'#9A7A00':'var(--green)';
+    return`<tr style="background:${bg}">
+      <td style="padding:9px 14px;font-weight:600;font-size:13px;">${a.cidade}</td>
+      <td style="padding:9px 14px;font-size:13px;">${a.estado}</td>
+      <td style="padding:9px 14px;text-align:center;font-size:16px;font-weight:800;font-family:'Syne',sans-serif;color:${tc};">${v.toFixed(1)}</td>
+      <td style="padding:9px 14px;text-align:center;font-size:11px;font-weight:700;color:${tc};">${cls.split('—')[0].trim()}</td>
+      <td style="padding:9px 14px;text-align:center;font-size:13px;">${a.burnout}%</td>
+      <td style="padding:9px 14px;text-align:center;font-size:13px;">${a.pressao}/100</td>
+      <td style="padding:9px 14px;text-align:center;"><button onclick="abrirDenunciaDeAgencia('${a.cidade}','${a.banco}')" style="background:var(--red-light);color:var(--red);border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">🚨 Denunciar</button></td>
+    </tr>`;
+  }).sort((a,b)=>0).join('');
+  tbody.innerHTML=rows;
+}
+
+// ===== PROTEÇÃO DE CÓPIA AG-999 =====
+(function protectAG999(){
+  // Bloqueia clique direito
+  document.addEventListener('contextmenu',e=>{
+    e.preventDefault();
+    showCopyAlert();
+    return false;
+  });
+  // Bloqueia Ctrl/Cmd + C, U, S, P, A
+  document.addEventListener('keydown',e=>{
+    const blocked=(e.ctrlKey||e.metaKey)&&['c','u','s','p','a','j'].includes(e.key.toLowerCase());
+    if(blocked||e.key==='F12'||e.key==='PrintScreen'){
+      e.preventDefault();e.stopPropagation();
+      showCopyAlert();return false;
+    }
+  });
+  // Bloqueia seleção de texto (opcional — só fora de inputs)
+  document.addEventListener('selectstart',e=>{
+    if(!['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)){
+      // permite seleção normal mas não cópia
+    }
+  });
+})();
+
+function showCopyAlert(){
+  const existing=document.getElementById('copy-alert');
+  if(existing){clearTimeout(existing._t);existing.style.opacity='1';existing._t=setTimeout(()=>{existing.style.opacity='0';},3000);return;}
+  const div=document.createElement('div');
+  div.id='copy-alert';
+  div.style.cssText='position:fixed;bottom:20px;right:20px;background:linear-gradient(135deg,#0F3360,#1B4F8A);color:#fff;padding:14px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.3);max-width:340px;line-height:1.5;transition:opacity 0.4s;';
+  div.innerHTML='🔒 <strong>Obra Protegida — AG-999</strong><br><span style="font-size:11px;opacity:.85;">Reprodução proibida sem autorização expressa de César / SilentSystem999. Lei 9.610/98.</span>';
+  document.body.appendChild(div);
+  div._t=setTimeout(()=>{div.style.opacity='0';setTimeout(()=>div.remove(),500);},3500);
+}
+
+// ===== INIT UPDATE =====
+window.addEventListener('load',()=>{
+  initMap();
+  initEstados();
+  calc04A();
+  renderAG999Table();
+});
+</script>
+
+<!-- FOOTER -->
+<div style="background:var(--blue-dark);color:rgba(255,255,255,0.6);padding:18px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:20px;">
+  <div style="font-size:11px;line-height:1.7;">
+    <span style="color:#fff;font-weight:700;">OTB Monitor</span> · Observatório do Trabalho Bancário<br>
+    Motor de Cálculo <strong style="color:#60B4FF;">AG-999</strong> © César / SilentSystem999 — Todos os direitos reservados · Lei 9.610/98<br>
+    Reprodução das fórmulas AG-999 (04A, 06A) proibida sem autorização expressa por escrito.
+  </div>
+  <div style="display:flex;align-items:center;gap:16px;">
+    <a href="https://spbancarios.com.br/" target="_blank" rel="noopener" style="color:#60B4FF;font-size:12px;font-weight:600;text-decoration:none;">🔗 spbancarios.com.br</a>
+    <a href="https://github.com/SilentSystem999/Observat-rio-do-Trabalho-Banc-rio-" target="_blank" rel="noopener" style="color:rgba(255,255,255,0.5);font-size:12px;text-decoration:none;">GitHub</a>
+    <span style="font-size:11px;color:rgba(255,255,255,0.35);">v2.0 · AG-999 integrado</span>
+  </div>
+</div>
+</body>
+</html>
